@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPA Keyboard</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@19.0.0",
+      "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+      "htm": "https://esm.sh/htm@3.1.1"
+    }
+  }
+  </script>
+  <style>
+    /* Inter for UI, Charis SIL for IPA symbols */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+    
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background-color: #f8fafc; 
+      color: #0f172a; 
+    }
+
+    /* Specialized class for IPA characters using Charis SIL */
+    .ipa-font {
+      font-family: 'Charis SIL', serif;
+    }
+
+    .char-btn { 
+      transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1); 
+      user-select: none;
+    }
+    .char-btn:hover { 
+      background-color: #fef08a; 
+      color: #F88669; 
+      border-color: #F88669; 
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    .char-btn:active { 
+      transform: translateY(0); 
+      scale: 0.95; 
+    }
+    
+    textarea { 
+      font-family: 'Charis SIL', serif; 
+      line-height: 1.5 !important;
+    }
+
+    textarea::placeholder {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 0.65em;
+      color: #f1f5f9; 
+    }
+
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    
+    .bg-primary { background-color: #F88669; }
+    .text-primary { color: #F88669; }
+    .border-primary { border-color: #F88669; }
+    
+    .bg-secondary { background-color: #00A5A9; }
+    .text-secondary { color: #00A5A9; }
+    .border-secondary { border-color: #00A5A9; }
+    
+    .focus-primary:focus { ring-color: #F88669; outline-color: #F88669; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import React, { useState, useRef, useEffect } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import htm from 'htm';
+
+    const html = htm.bind(React.createElement);
+
+    const RAW_SYMBOLS = {
+      Consonants: [
+        'p', 'b', 'ɓ', 'ɸ', 'β', 'f', 'v', 'ⱱ',
+        't', 'd', 'ɗ', 'ʈ', 'ɖ', 'θ', 'ð',
+        'k', 'ɡ', 'ɠ', 'q', 'ɢ', 'ʛ', 'x', 'ɣ', 'χ', 'ʁ',
+        'm', 'ɱ', 'n', 'ɳ', 'ɲ', 'ŋ', 'ɴ',
+        's', 'z', 'ʃ', 'ʒ', 'ʂ', 'ʐ', 'ɕ', 'ʑ', 'ç', 'ʝ',
+        'r', 'ɾ', 'ɽ', 'ʀ', 'ʙ', 'ɺ',
+        'l', 'ɬ', 'ɮ', 'ɭ', 'ʎ', 'ʟ',
+        'h', 'ɦ', 'ħ', 'ʕ', 'ʜ', 'ʔ', 'ʡ', 'ʢ', 'ɧ',
+        'w', 'ʍ', 'ɥ', 'j', 'ɰ', 'ɹ', 'ɻ', 'ʋ',
+        'ʘ', 'ǀ', 'ǃ', 'ǂ', 'ǁ'
+      ],
+      Vowels: [
+        'i', 'y', 'ɪ', 'ʏ', 'ɨ', 'ʉ',
+        'e', 'ə', 'ɘ', 'ɛ', 'ɜ', 'ɞ',
+        'o', 'ø', 'ɵ', 'ɔ', 'œ',
+        'a', 'ɑ', 'ɐ', 'ɒ', 'æ', 'ɶ',
+        'u', 'ɯ', 'ʊ', 'ʌ', 'ɤ'
+      ],
+      "Diacritics": [
+        'ˈ', 'ˌ', 'ː', 'ˑ', 'ʼ', '˘', '◌̥', '◌̬', '◌ʰ', '◌̹', '◌̜', '◌̟', '◌̠', '◌̈', '◌̽', '◌̩', '◌̯', '◌˞', '◌̤', '◌̰', '◌̼', '◌̪', '◌̺', '◌̻', '◌̃', '◌ⁿ', '◌ˡ', '◌̚',
+        '◌̋', '◌́', '◌̄', '◌̀', '◌̏', '◌̌', '◌̂', '◌᷄', '◌᷅', '◌᷈', '◌͡', '◌͜'
+      ]
+    };
+
+    const App = () => {
+      const [text, setText] = useState('');
+      const textareaRef = useRef(null);
+
+      const insert = (char) => {
+        const clean = char.replace(/^◌/, '');
+        if (textareaRef.current) {
+          const { selectionStart, selectionEnd } = textareaRef.current;
+          const nextVal = text.substring(0, selectionStart) + clean + text.substring(selectionEnd);
+          setText(nextVal);
+          const newPos = selectionStart + clean.length;
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              textareaRef.current.setSelectionRange(newPos, newPos);
+            }
+          }, 0);
+        } else {
+          setText(prev => prev + clean);
+        }
+      };
+
+      return html`
+        <div className="min-h-screen p-4 md:p-12 flex flex-col items-center">
+          <main className="w-full max-w-5xl space-y-8">
+            
+            <header className="flex flex-col items-start gap-2">
+              <h1 className="text-4xl font-black text-slate-900 tracking-tighter">IPA Keyboard</h1>
+              <p className="text-slate-500 font-medium tracking-tight">A randomised International Phonetic Alphabet keyboard</p>
+            </header>
+
+            <section className="relative group" aria-label="Text Input Area">
+              <div className="absolute -inset-1 bg-gradient-to-r from-orange-100 to-teal-100 rounded-[2.5rem] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+              <div className="relative bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden ring-1 ring-slate-100">
+                <textarea
+                  ref=${textareaRef}
+                  value=${text}
+                  onInput=${(e) => setText(e.target.value)}
+                  aria-label="Insert IPA symbols here"
+                  className="ipa-font w-full h-48 md:h-64 p-8 text-3xl md:text-4xl focus:outline-none resize-none leading-relaxed text-slate-900"
+                  placeholder="Insert symbols..."
+                />
+                <div className="bg-slate-50/50 px-8 py-4 border-t border-slate-100 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">${text.length} Characters</span>
+                    <span className="text-[10px] text-slate-200">|</span>
+                    <button onClick=${() => setText('')} aria-label="Clear all text" className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition">Clear</button>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    © 2026 Cong Zhang @ Newcastle University
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <div className="space-y-12 bg-white rounded-[2rem] p-6 md:p-10 shadow-sm border border-slate-100">
+              ${Object.entries(RAW_SYMBOLS).map(([group, list]) => html`
+                <section key=${group} className="space-y-4">
+                  <h2 className="text-[10px] font-black uppercase tracking-[0.3em] mb-4 border-l-2 pl-3" style=${{ color: '#00A5A9', borderColor: '#00A5A9' }}>
+                    ${group}
+                  </h2>
+                  <div className="flex flex-wrap gap-2 md:gap-3">
+                    ${list.map(char => html`
+                      <button 
+                        key=${char} 
+                        onClick=${() => insert(char)} 
+                        aria-label=${`Insert IPA symbol ${char}`}
+                        className="ipa-font char-btn min-w-[3.5rem] h-14 px-3 bg-white border border-slate-200 rounded-2xl text-2xl md:text-3xl font-medium shadow-sm flex items-center justify-center"
+                      >
+                        ${char}
+                      </button>
+                    `)}
+                  </div>
+                </section>
+              `)}
+            </div>
+          </main>
+
+          <footer className="mt-20 py-10 border-t border-slate-100 w-full flex flex-col items-center gap-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-300 text-center px-4">
+              Phonetic Input Tool • Perfect for digital phonetics exams
+            </p>
+          </footer>
+        </div>
+      `;
+    };
+
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      const root = createRoot(rootElement);
+      root.render(React.createElement(App));
+    }
+  </script>
+</body>
+</html>
